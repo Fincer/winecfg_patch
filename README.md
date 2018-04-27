@@ -19,9 +19,9 @@ This project adds the following features to the default Wine configuration dialo
 
 - Adds checkbox: Check Float Constants in D3D shaders
 
-IMAGE_PLACEHOLDER
+![winecfg-links](https://raw.githubusercontent.com/Fincer/winecfg_patch/master/images/winecfg-links.png)
 
-*Above features have already been implemented*
+NEW WINECFG FEATURES. The project adds prefix architecture information & prefix folder link to 'About' tab, and several new checkboxes to 'Staging' tab. These features have already been implemented.
 
 ## System Requirements
 
@@ -70,12 +70,16 @@ There are several ideas how to improve usability of Wine configuration window. T
     * Expanded list of available DLL overrides for easier management
         * In current Wine it is only a single-line list which is troublesome to use
 
+        ![winecfg-dlloverride-redesign](https://raw.githubusercontent.com/Fincer/winecfg_patch/master/images/winecfg-dlloverride-redesign.png)
+
+        DLL OVERRIDE RE-DESIGN. This manipulated image is for demonstration purposes.
+
     * DLL override multiselection
         * with possibility to set all selected overrides to use any mixture of Native, Builtin DLLs
-
-IMAGE_PLACEHOLDER
-
-*This manipulated image is for demonstration purposes*
+        
+        ![winecfg-dlloverride-multiselection](https://raw.githubusercontent.com/Fincer/winecfg_patch/master/images/winecfg-dlloverride-multiselect.png)
+        
+        DLL MULTISELECTION. This manipulated image is for demonstration purposes.
 
 - **Debug tab** - add new this new tab to winecfg with the following contents:
 
@@ -120,9 +124,9 @@ IMAGE_PLACEHOLDER
                 * If above conditions are not met, grey the button out
                 * Needs additional back-end support, reverting Winetricks changes not yet implemented in Wine
 
-IMAGE_PLACEHOLDER
+![winecfg-winetricks](https://raw.githubusercontent.com/Fincer/winecfg_patch/master/images/winecfg-winetricks.png)
 
-*This manipulated image is for demonstration purposes*
+WINETRICKS TAB. This manipulated image is for demonstration purposes.
 
 ----------------------------------
 
