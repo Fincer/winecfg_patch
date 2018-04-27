@@ -1,0 +1,326 @@
+diff -Burp a/programs/winecfg/about.c b/programs/winecfg/about.c
+--- a/programs/winecfg/about.c	2018-04-27 21:52:34.925054200 +0300
++++ b/programs/winecfg/about.c	2018-04-27 22:24:01.726867598 +0300
+@@ -5,6 +5,7 @@
+  * Copyright 2003 Dimitrie O. Paun
+  * Copyright 2003 Mike Hearn
+  * Copyright 2010 Joel Holdsworth
++ * Copyright 2018 Pekka Helenius
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -30,6 +31,11 @@
+ #include <commctrl.h>
+ #include <shellapi.h>
+ 
++#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdio.h>
++
+ #include "resource.h"
+ #include "winecfg.h"
+ 
+@@ -44,6 +50,26 @@ AboutDlgProc (HWND hDlg, UINT uMsg, WPAR
+     HDC hDC;
+     RECT rcClient, rcRect;
+     char *owner, *org;
++    char *prefixpath, *token, *length, *prefixdir;
++    char *home, *defaultdir;
++    char *arch_title, *prefix_title, *arch;
++    
++    prefixpath = wine_get_config_dir();
++
++    token = strrchr(prefixpath, '/');
++    length = strlen(token);
++    prefixdir = malloc(length);
++    memcpy(prefixdir, token+1, length);
++
++    home = getenv("HOME");
++    defaultdir = malloc(strlen(home) + strlen("/.wine") + 1);
++    
++    memcpy(defaultdir, home, strlen(home));
++    memcpy(defaultdir + strlen(home), "/.wine", strlen("/.wine") + 1);
++    
++    if(strcmp(prefixpath,defaultdir) == 0) {
++        prefixdir = "Default";
++    }
+ 
+     switch (uMsg)
+     {
+@@ -71,8 +97,16 @@ AboutDlgProc (HWND hDlg, UINT uMsg, WPAR
+ 
+         case NM_CLICK:
+         case NM_RETURN:
+-            if(wParam == IDC_ABT_WEB_LINK)
++            if(wParam == IDC_ABT_WEB_LINK) {
+                 ShellExecuteA(NULL, "open", PACKAGE_URL, NULL, NULL, SW_SHOW);
++            }
++            else if(wParam == IDC_ABT_PREFIX) {
++                
++                /* prepare unix command for opening prefixdir */
++                char *openfilemgr = malloc(strlen("xdg-open") + strlen(prefixpath) + 1);
++                sprintf(openfilemgr, "%s %s", "xdg-open", prefixpath);
++                system(openfilemgr);
++            }
+             break;
+         }
+         break;
+@@ -90,11 +124,38 @@ AboutDlgProc (HWND hDlg, UINT uMsg, WPAR
+         SetDlgItemTextA(hDlg, IDC_ABT_OWNER, owner);
+         SetDlgItemTextA(hDlg, IDC_ABT_ORG, org);
+ 
++        /* read architecture info from registry */
++        arch = get_reg_key(HKEY_LOCAL_MACHINE, "System\\CurrentControlSet\\Control\\Session Manager\\Environment",
++                            "PROCESSOR_ARCHITECTURE", "");
++
++        if(strcmp(arch,"AMD64") == 0) {
++            arch = "64-bit";
++        }
++        else if(strcmp(arch,"x86") == 0) {
++            arch = "32-bit";
++        } else {
++            arch = "Undefined";
++        }
++
++        SetDlgItemTextA(hDlg, IDC_ABT_ARCH, arch);
++        
++        arch_title = "Architecture:";
++        prefix_title = "Prefix:";
++        
++        SetDlgItemTextA(hDlg, IDC_ABT_ARCH_TITLE, arch_title);
++        SetDlgItemTextA(hDlg, IDC_ABT_PREFIX_TITLE, prefix_title);
++
+         SendMessageW(GetParent(hDlg), PSM_UNCHANGED, 0, 0);
+ 
+         HeapFree(GetProcessHeap(), 0, owner);
+         HeapFree(GetProcessHeap(), 0, org);
+ 
++        /* prepare prefix link text */
++        char *openprefix;
++        openprefix = malloc(strlen(prefixdir) + 1);     
++        sprintf(openprefix, "<a> %s </a>", prefixdir);
++        SetDlgItemTextA(hDlg, IDC_ABT_PREFIX, openprefix);
++        
+         /* prepare the panel */
+         hWnd = GetDlgItem(hDlg, IDC_ABT_PANEL);
+         if(hWnd)
+@@ -171,6 +232,10 @@ AboutDlgProc (HWND hDlg, UINT uMsg, WPAR
+         case IDC_ABT_PANEL_TEXT:
+         case IDC_ABT_LICENSE_TEXT:
+         case IDC_ABT_WEB_LINK:
++        case IDC_ABT_ARCH:
++        case IDC_ABT_PREFIX:
++        case IDC_ABT_ARCH_TITLE:
++        case IDC_ABT_PREFIX_TITLE:
+             SetBkColor((HDC)wParam, GetSysColor(COLOR_WINDOW));
+             return (INT_PTR)CreateSolidBrush(GetSysColor(COLOR_WINDOW));
+         }
+Binary files a/programs/winecfg/about.o and b/programs/winecfg/about.o differ
+Binary files a/programs/winecfg/appdefaults.o and b/programs/winecfg/appdefaults.o differ
+Binary files a/programs/winecfg/audio.o and b/programs/winecfg/audio.o differ
+Binary files a/programs/winecfg/drive.o and b/programs/winecfg/drive.o differ
+Binary files a/programs/winecfg/drivedetect.o and b/programs/winecfg/drivedetect.o differ
+Binary files a/programs/winecfg/driveui.o and b/programs/winecfg/driveui.o differ
+Binary files a/programs/winecfg/libraries.o and b/programs/winecfg/libraries.o differ
+Binary files a/programs/winecfg/main.o and b/programs/winecfg/main.o differ
+diff -Burp a/programs/winecfg/resource.h b/programs/winecfg/resource.h
+--- a/programs/winecfg/resource.h	2018-04-27 21:52:34.937058231 +0300
++++ b/programs/winecfg/resource.h	2018-04-27 22:25:07.042889774 +0300
+@@ -6,6 +6,7 @@
+  * Copyright 2003 Mark Westcott
+  * Copyright 2004 Mike Hearn
+  * Copyright 2005 Raphael Junqueira
++ * Copyright 2018 Pekka Helenius
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -218,6 +219,9 @@
+ #define IDC_ENABLE_EAX                  9003
+ #define IDC_ENABLE_HIDEWINE             9004
+ #define IDC_ENABLE_GTK3                 9005
++#define IDC_DISABLE_GLSL                9006
++#define IDC_MULTISAMPLING               9007
++#define IDC_FLOATCONSTS                 9008
+ 
+ /* About tab */
+ #define IDC_ABT_OWNER                8432
+@@ -227,3 +231,7 @@
+ #define IDC_ABT_TITLE_TEXT           8436
+ #define IDC_ABT_WEB_LINK             8437
+ #define IDC_ABT_LICENSE_TEXT         8438
++#define IDC_ABT_ARCH                 8439
++#define IDC_ABT_PREFIX               8440
++#define IDC_ABT_ARCH_TITLE           8441
++#define IDC_ABT_PREFIX_TITLE         8442
+diff -Burp a/programs/winecfg/staging.c b/programs/winecfg/staging.c
+--- a/programs/winecfg/staging.c	2018-04-27 21:52:34.937058231 +0300
++++ b/programs/winecfg/staging.c	2018-04-27 22:43:34.523541838 +0300
+@@ -121,6 +121,47 @@ static void gtk3_set(BOOL status)
+ #endif
+ }
+ 
++static BOOL glsl_get(void)
++{
++    BOOL ret;
++    char *value = get_reg_key(config_key, keypath("Direct3D"), "UseGLSL", "enabled");
++    ret = (value && !strcmp(value, "disabled"));
++    HeapFree(GetProcessHeap(), 0, value);
++    return ret;    
++}
++static void glsl_set(BOOL status)
++{
++    set_reg_key(config_key, keypath("Direct3D"), "UseGLSL", status ? "disabled" : "enabled");
++}
++
++static BOOL msampl_get(void)
++{
++    BOOL ret;
++    char *value = get_reg_key(config_key, keypath("Direct3D"), "Multisampling", "enabled");
++    ret = (value && !strcmp(value, "disabled"));
++    HeapFree(GetProcessHeap(), 0, value);
++    return ret;
++}
++static void msampl_set(BOOL status)
++{
++    set_reg_key(config_key, keypath("Direct3D"), "Multisampling", status ? "disabled" : "enabled");
++
++}
++
++static BOOL fconsts_get(void)
++{
++    BOOL ret;
++    char *value = get_reg_key(config_key, keypath("Direct3D"), "CheckFloatConstants", "disabled");
++    ret = (value && !strcmp(value, "enabled"));
++    HeapFree(GetProcessHeap(), 0, value);
++    return ret;
++}
++static void fconsts_set(BOOL status)
++{
++    set_reg_key(config_key, keypath("Direct3D"), "CheckFloatConstants", status ? "enabled" : "disabled");
++
++}
++
+ static void load_staging_settings(HWND dialog)
+ {
+     CheckDlgButton(dialog, IDC_ENABLE_CSMT, csmt_get() ? BST_CHECKED : BST_UNCHECKED);
+@@ -128,6 +169,52 @@ static void load_staging_settings(HWND d
+     CheckDlgButton(dialog, IDC_ENABLE_EAX, eax_get() ? BST_CHECKED : BST_UNCHECKED);
+     CheckDlgButton(dialog, IDC_ENABLE_HIDEWINE, hidewine_get() ? BST_CHECKED : BST_UNCHECKED);
+     CheckDlgButton(dialog, IDC_ENABLE_GTK3, gtk3_get() ? BST_CHECKED : BST_UNCHECKED);
++    CheckDlgButton(dialog, IDC_DISABLE_GLSL, glsl_get() ? BST_CHECKED : BST_UNCHECKED);
++    CheckDlgButton(dialog, IDC_MULTISAMPLING, msampl_get() ? BST_CHECKED : BST_UNCHECKED);
++    CheckDlgButton(dialog, IDC_FLOATCONSTS, fconsts_get() ? BST_CHECKED : BST_UNCHECKED);
++    
++    /* TODO
++    
++    DirectDrawRenderer (Direct3D)       COMBOBOX            
++        Values [gdi, opengl]
++        Default: opengl
++        Human-readable equivalents are GDI, OpenGL
++        Label: DirectDraw Renderer
++    
++    MaxVersionGL (Direct3D)             COMBOBOX            
++        Values: [4.5, 3.2, 1.0]
++        Equal DWORD values are 40005 30002 10000
++        Default: 1.0
++        Label: OpenGL Version
++    
++    OffscreenRenderingMode (Direct3D)   COMBOBOX            
++        Values: [fbo, backbuffer]   
++        Default: fbo
++        Human-readable equivalents are FBO, Backbuffer
++        Label: Offscreen Rendering
++    
++    VideoMemorySize (Direct3D)          COMBOBOX            
++        Values: [8192, 4096, 3072, 2048, 1024, 768, 512, 384, 256, 128, 64, 32] 
++        Default: Not specified (this registry value doesn't exist)
++        Label: Video Memory (MiB)
++    
++    MouseWarpOverride (DirectInput)     COMBOBOX            
++        Values: [enable, disable, force]    
++        Default: enable
++        Human-readable equivalents are Enable, Disable, Force
++        Label: Mouse Warp
++        
++    ShowCrashDialog (WineDbg)           
++        yes/no checkbtn           
++        Default: show dialogs
++        Label: Hide Wine crash dialog 
++        
++    ForceRefreshRate (DirectDraw)       input value
++        Value: User input (only integers allowed, max value is 120, min value is 1)
++        Default: Not specified (this registry value doesn't exist)
++        Label: DirectDraw Refresh Rate
++    
++    */
+ 
+ #ifndef HAVE_VAAPI
+     disable(IDC_ENABLE_VAAPI);
+@@ -180,6 +267,18 @@ INT_PTR CALLBACK StagingDlgProc(HWND hDl
+             gtk3_set(IsDlgButtonChecked(hDlg, IDC_ENABLE_GTK3) == BST_CHECKED);
+             SendMessageW(GetParent(hDlg), PSM_CHANGED, 0, 0);
+             return TRUE;
++        case IDC_DISABLE_GLSL:
++            glsl_set(IsDlgButtonChecked(hDlg, IDC_DISABLE_GLSL) == BST_CHECKED);
++            SendMessageW(GetParent(hDlg), PSM_CHANGED, 0, 0);
++            return TRUE;
++        case IDC_MULTISAMPLING:
++            msampl_set(IsDlgButtonChecked(hDlg, IDC_MULTISAMPLING) == BST_CHECKED);
++            SendMessageW(GetParent(hDlg), PSM_CHANGED, 0, 0);
++            return TRUE;
++        case IDC_FLOATCONSTS:
++            fconsts_set(IsDlgButtonChecked(hDlg, IDC_FLOATCONSTS) == BST_CHECKED);
++            SendMessageW(GetParent(hDlg), PSM_CHANGED, 0, 0);
++            return TRUE;
+         }
+         break;
+     }
+Binary files a/programs/winecfg/staging.o and b/programs/winecfg/staging.o differ
+Binary files a/programs/winecfg/theme.o and b/programs/winecfg/theme.o differ
+Binary files a/programs/winecfg/winecfg.exe.fake and b/programs/winecfg/winecfg.exe.fake differ
+Binary files a/programs/winecfg/winecfg.exe.so and b/programs/winecfg/winecfg.exe.so differ
+Binary files a/programs/winecfg/winecfg.o and b/programs/winecfg/winecfg.o differ
+diff -Burp a/programs/winecfg/winecfg.rc b/programs/winecfg/winecfg.rc
+--- a/programs/winecfg/winecfg.rc	2018-04-27 21:52:34.937058231 +0300
++++ b/programs/winecfg/winecfg.rc	2018-04-27 22:30:51.184369822 +0300
+@@ -3,6 +3,7 @@
+  *
+  * Copyright 2002 Jaco Greeff
+  * Copyright 2003 Dimitrie O. Paun
++ * Copyright 2018 Pekka Helenius
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+@@ -135,11 +136,15 @@ STYLE WS_CHILD
+ FONT 8, "MS Shell Dlg"
+ BEGIN
+     CONTROL         "", IDC_ABT_PANEL, "STATIC", SS_OWNERDRAW, 0, 0, 260, 140
+-    LTEXT           "",IDC_ABT_TITLE_TEXT,105,30,55,30
+-    LTEXT           "",IDC_ABT_PANEL_TEXT,160,43,140,8
+-    CONTROL         "",IDC_ABT_WEB_LINK,"SysLink", LWS_TRANSPARENT, 105,53,106,8
++    LTEXT           "",IDC_ABT_TITLE_TEXT,105,25,55,30
++    LTEXT           "",IDC_ABT_PANEL_TEXT,160,38,140,8
++    LTEXT           "", IDC_ABT_ARCH_TITLE, 105, 50, 133, 8
++    LTEXT           "", IDC_ABT_ARCH, 158, 50, 160, 8
++    LTEXT           "", IDC_ABT_PREFIX_TITLE, 105, 59, 133, 8
++    CONTROL         "", IDC_ABT_PREFIX,"SysLink", LWS_TRANSPARENT, 158, 59, 160, 8
++    CONTROL         "", IDC_ABT_WEB_LINK,"SysLink", LWS_TRANSPARENT, 105,75,106,8
+     LTEXT           "This program is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.",
+-                    IDC_ABT_LICENSE_TEXT,105,64,145,66
++                    IDC_ABT_LICENSE_TEXT,105,86,145,50
+     GROUPBOX        "Windows registration information", IDC_STATIC, 15, 155, 230, 55
+     LTEXT           "&Owner:", IDC_STATIC, 22, 171, 40, 20
+     EDITTEXT        IDC_ABT_OWNER, 75, 171, 160, 13, ES_AUTOHSCROLL | WS_TABSTOP
+@@ -320,6 +325,9 @@ BEGIN
+     CONTROL     "Enable Environmental Audio E&xtensions (EAX)",IDC_ENABLE_EAX,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,70,230,8
+     CONTROL     "&Hide Wine version from applications",IDC_ENABLE_HIDEWINE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,85,230,8
+     CONTROL     "Enable &GTK3 Theming",IDC_ENABLE_GTK3,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,100,230,8
++    CONTROL     "Disable G&LSL Support",IDC_DISABLE_GLSL,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,115,230,8
++    CONTROL     "Disable &Multisampling Support",IDC_MULTISAMPLING,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,130,230,8
++    CONTROL     "Check &Float Constants in D3D shaders",IDC_FLOATCONSTS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,145,230,8
+ END
+ 
+ LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+Binary files a/programs/winecfg/winecfg.res and b/programs/winecfg/winecfg.res differ
+Binary files a/programs/winecfg/x11drvdlg.o and b/programs/winecfg/x11drvdlg.o differ
