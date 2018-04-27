@@ -4,6 +4,8 @@
 #
 # Wine must be installed.
 # Wine-Staging recommended (and required by the original patch file).
+#
+# Author: Pekka Helenius (~Fincer), 2018
 
 function do_winecfg_changes {
 

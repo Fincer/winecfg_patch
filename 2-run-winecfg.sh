@@ -1,6 +1,8 @@
 #!/bin/sh
 
 # Make patched winecfg dialog and run it on Wine
+#
+# Author: Pekka Helenius (~Fincer), 2018
 
 WORKDIR=$(pwd)
 
